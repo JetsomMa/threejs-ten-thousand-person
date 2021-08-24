@@ -1,0 +1,295 @@
+<!doctype html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>Large Persons</title>
+</head>
+
+<body>
+  <div id="container"></div>
+
+  <script type="module">
+    import * as THREE from './three.module.js';
+    import {
+      OrbitControls
+    } from './OrbitControls.js';
+
+    import {
+      PersonShader
+    } from './person-shader.js'
+
+    let renderer, scene, camera;
+    let personMesh // 人员的mesh对象
+    let personMap = new Map() // 人员的map容器
+    let personSize = 5
+    let advance = 0 //刷新次数，用于校准屏幕刷新频率
+
+    let creenRatio = 50 //屏幕刷新频率
+    let zoneLimit = 3 //人每秒移动范围限制
+
+    let personNumber = 10 //人员数量设定
+
+    // 初始化渲染器
+    renderer = new THREE.WebGLRenderer();
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+
+    // 获取dom容器
+    const container = document.getElementById('container');
+    container.appendChild(renderer.domElement);
+
+    // 初始化 camera
+    camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 10000);
+    camera.position.y = 150;
+
+    // 初始化 鼠标控制器
+    const controls = new OrbitControls(camera, renderer.domElement);
+
+    // 初始化 scene
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xffffff);
+
+    // 当屏幕比例发生变化时候，调整视图
+    window.addEventListener('resize', onWindowResize);
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    // 初始化人信息
+    initPerson()
+
+    // 每秒刷新人的信息
+    setInterval(() => {
+      refreshPersonInfo()
+    }, 1000)
+
+    // 初始化人的mesh对象
+    initMesh()
+
+    // 开启渲染器
+    animate()
+
+    function initPerson() {
+      for (let i = 0; i < personNumber; i++) {
+        personMap.set(i, {
+          uuid: i,
+          x: 0,
+          y: 0,
+          z: 0,
+          xTarget: 0,
+          yTarget: 0,
+          zTarget: 0,
+          xDiff: 0,
+          yDiff: 0,
+          zDiff: 0,
+          deleteStatus: i % 2 === 0
+        })
+      }
+    }
+
+    function refreshPersonInfo() {
+
+      for (let i = 0; i < personNumber; i++) {
+        // 模拟人员位置发生变化
+        let newPerson = {
+          uuid: i,
+          xDiff: random(-1 * zoneLimit, zoneLimit),
+          yDiff: 0,
+          zDiff: random(-1 * zoneLimit, zoneLimit)
+        }
+
+        let person = personMap.get(i)
+        if (Math.abs(person.x + newPerson.xDiff) > window.innerWidth / 2) {
+          newPerson.xDiff = -1 * newPerson.xDiff
+        }
+        if (Math.abs(person.z + newPerson.zDiff) > window.innerHeight / 2) {
+          newPerson.zDiff = -1 * newPerson.zDiff
+        }
+        person.xDiff = newPerson.xDiff / creenRatio
+        person.xTarget = person.xDiff + person.x
+
+        person.zDiff = newPerson.zDiff / creenRatio
+        person.zTarget = person.zDiff + person.z
+      }
+      advance = 0
+
+      console.error("personMap", personMap)
+    }
+
+    function initMesh() {
+      const geometry = new THREE.BufferGeometry();
+      const positions = [];
+      const texCoord = [];
+      const size = [];
+      const complementaryColor = [];
+
+      let diffSize = personSize / 2.0
+
+      for (let item of personMap.values()) {
+        let person = item
+
+        positions.push(person.x + diffSize, person.y, person.z - diffSize,
+          person.x - diffSize, person.y, person.z - diffSize,
+          person.x - diffSize, person.y, person.z + diffSize,
+          person.x + diffSize, person.y, person.z + diffSize);
+        texCoord.push(0, 0, 1, 0, 0, 1, 1, 1);
+
+
+        // positions.push(person.x); // x
+        // positions.push(person.y); // y
+        // positions.push(person.z); // z
+
+        size.push(personSize)
+
+        complementaryColor.push(1)
+        complementaryColor.push(1)
+        complementaryColor.push(1)
+        complementaryColor.push(1)
+      }
+
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      geometry.setAttribute('texCoord', new THREE.Float32BufferAttribute(texCoord, 2));
+      geometry.setAttribute('size', new THREE.Float32BufferAttribute(size, 1));
+      geometry.setAttribute('complementaryColor', new THREE.Float32BufferAttribute(complementaryColor, 4));
+
+      const material = new THREE.ShaderMaterial({
+        uniforms: PersonShader.uniforms,
+        vertexShader: PersonShader.vertexShader,
+        fragmentShader: PersonShader.fragmentShader
+      });
+      material.depthTest = false;
+      material.transparent = true;
+
+      material.uniforms.color.value = new THREE.Color(0xffffff)
+      material.uniforms.pointTexture.value = new THREE.TextureLoader().load('assets/images/p-buyer.png')
+
+      // const material = new THREE.PointsMaterial({
+      //   transparent: true,
+      //   depthTest: false,
+      //   size: personSize
+      // })
+      // material.map = new THREE.TextureLoader().load("assets/images/p-buyer.png")
+
+      personMesh = new THREE.Points(geometry, material);
+      scene.add(personMesh);
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      changeData()
+
+      renderer.render(scene, camera);
+    }
+
+    // 修正人员数据
+    function changeData() {
+      const positions = personMesh.geometry.attributes.position.array;
+      const size = personMesh.geometry.attributes.position.array;
+      const complementaryColor = personMesh.geometry.attributes.position.array;
+
+      let index = 0
+
+      // console.time("changeData")
+
+      // Array进行for循环取值  30万人平均用时：3.0-4.7
+      // for (let i = 0; i < personArray.length; i++) {
+      //   let person = personArray[i]
+      //   index = i * 3
+
+      //   person.x = person.x + person.xDiff
+      //   person.z = person.z + person.zDiff
+      //   positions[index + 0] = person.x
+      //   positions[index + 1] = person.y
+      //   positions[index + 2] = person.z
+      // }
+
+      // Map进行for取值Map.values  30万人平均用时：3.9-5.1
+      for (let item of personMap.values()) {
+        let person = item
+
+        person.x = person.x + person.xDiff
+        person.z = person.z + person.zDiff
+
+        positions[index * 3] = person.x
+        positions[index * 3 + 1] = person.y
+        positions[index * 3 + 2] = person.z
+
+        if (person.deleteStatus) {
+          size[index] = personSize * 2
+
+          complementaryColor[index * 4] = 1
+          complementaryColor[index * 4 + 1] = 0
+          complementaryColor[index * 4 + 2] = 0
+          complementaryColor[index * 4 + 3] = 0.2
+        }
+
+        index++
+      }
+
+      // Map进行forEach取值  30万人平均用时：6.3-7.8
+      // personMap.forEach((person, uuid) => {
+
+      //   person.x = person.x + person.xDiff
+      //   person.z = person.z + person.zDiff
+      //   positions[index + 0] = person.x
+      //   positions[index + 1] = person.y
+      //   positions[index + 2] = person.z
+
+      //   index += 3
+      // });
+
+      // Map进行for取值Map  30万人平均用时：5.2-7.4
+      // for (let item of personMap) {
+      //   let person = item[1]
+
+      //   person.x = person.x + person.xDiff
+      //   person.z = person.z + person.zDiff
+      //   positions[index + 0] = person.x
+      //   positions[index + 1] = person.y
+      //   positions[index + 2] = person.z
+
+      //   index += 3
+      // }
+
+      // Map进行for取值Map.entries  30万人平均用时：5.5-6.6
+      // for (let item of personMap.entries()) {
+      //   let person = item[1]
+
+      //   person.x = person.x + person.xDiff
+      //   person.z = person.z + person.zDiff
+      //   positions[index + 0] = person.x
+      //   positions[index + 1] = person.y
+      //   positions[index + 2] = person.z
+
+      //   index += 3
+      // }
+
+      // console.timeEnd("changeData")
+
+      advance++
+      if (advance > creenRatio) {
+        creenRatio = advance
+      }
+      personMesh.geometry.attributes.position.needsUpdate = true;
+      personMesh.geometry.attributes.size.needsUpdate = true;
+      personMesh.geometry.attributes.complementaryColor.needsUpdate = true;
+    }
+
+    // 获取随机数
+    function random(min, max) {
+      if (max === undefined) {
+        max = min;
+        min = 0;
+      }
+      return Math.random() * (max - min) + min;
+    }
+  </script>
+</body>
+
+</html>
