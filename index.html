@@ -123,8 +123,13 @@
 
     function initMesh() {
       const geometry = new THREE.BufferGeometry();
-      const positions = [];
-      const texCoord = [];
+
+      // const currentPosition = [];
+      const position = [];
+      const normal = [];
+      const uv = [];
+      const index = [];
+
       const size = [];
       const complementaryColor = [];
 
@@ -133,27 +138,23 @@
       for (let item of personMap.values()) {
         let person = item
 
-        positions.push(person.x + diffSize, person.y, person.z - diffSize,
-          person.x - diffSize, person.y, person.z - diffSize,
-          person.x - diffSize, person.y, person.z + diffSize,
-          person.x + diffSize, person.y, person.z + diffSize);
-        texCoord.push(0, 0, 1, 0, 0, 1, 1, 1);
+        position.push(person.x, person.y, person.z); 
 
-
-        // positions.push(person.x); // x
-        // positions.push(person.y); // y
-        // positions.push(person.z); // z
+        // currentPosition.push(person.x, person.y, person.z); 
+        // position.push(-1, 0, -1, -1, 0, 1, 1, 0, 1, 1, 0, -1);
+        normal.push(0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0)
+        uv.push(-1, -1, -1, 1, 1, 1, 1, -1);
+        index.push(1, 0, 3, 3, 2, 1)
 
         size.push(personSize)
-
-        complementaryColor.push(1)
-        complementaryColor.push(1)
-        complementaryColor.push(1)
-        complementaryColor.push(1)
+        complementaryColor.push(1, 1, 1, 1)
       }
 
-      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-      geometry.setAttribute('texCoord', new THREE.Float32BufferAttribute(texCoord, 2));
+      // geometry.setAttribute('currentPosition', new THREE.Float32BufferAttribute(currentPosition, 3));
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(position, 3));
+      geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normal, 3));
+      geometry.setAttribute('uv', new THREE.Float32BufferAttribute(size, 2));
+      geometry.setAttribute('index', new THREE.Float32BufferAttribute(size, 1));
       geometry.setAttribute('size', new THREE.Float32BufferAttribute(size, 1));
       geometry.setAttribute('complementaryColor', new THREE.Float32BufferAttribute(complementaryColor, 4));
 
@@ -165,7 +166,6 @@
       material.depthTest = false;
       material.transparent = true;
 
-      material.uniforms.color.value = new THREE.Color(0xffffff)
       material.uniforms.pointTexture.value = new THREE.TextureLoader().load('assets/images/p-buyer.png')
 
       // const material = new THREE.PointsMaterial({
@@ -189,9 +189,9 @@
 
     // 修正人员数据
     function changeData() {
-      const positions = personMesh.geometry.attributes.position.array;
-      const size = personMesh.geometry.attributes.position.array;
-      const complementaryColor = personMesh.geometry.attributes.position.array;
+      const currentPosition = personMesh.geometry.attributes.position.array;
+      const size = personMesh.geometry.attributes.size.array;
+      const complementaryColor = personMesh.geometry.attributes.complementaryColor.array;
 
       let index = 0
 
@@ -204,9 +204,9 @@
 
       //   person.x = person.x + person.xDiff
       //   person.z = person.z + person.zDiff
-      //   positions[index + 0] = person.x
-      //   positions[index + 1] = person.y
-      //   positions[index + 2] = person.z
+      //   currentPosition[index + 0] = person.x
+      //   currentPosition[index + 1] = person.y
+      //   currentPosition[index + 2] = person.z
       // }
 
       // Map进行for取值Map.values  30万人平均用时：3.9-5.1
@@ -216,9 +216,9 @@
         person.x = person.x + person.xDiff
         person.z = person.z + person.zDiff
 
-        positions[index * 3] = person.x
-        positions[index * 3 + 1] = person.y
-        positions[index * 3 + 2] = person.z
+        currentPosition[index * 3] = person.x
+        currentPosition[index * 3 + 1] = person.y
+        currentPosition[index * 3 + 2] = person.z
 
         if (person.deleteStatus) {
           size[index] = personSize * 2
@@ -237,9 +237,9 @@
 
       //   person.x = person.x + person.xDiff
       //   person.z = person.z + person.zDiff
-      //   positions[index + 0] = person.x
-      //   positions[index + 1] = person.y
-      //   positions[index + 2] = person.z
+      //   currentPosition[index + 0] = person.x
+      //   currentPosition[index + 1] = person.y
+      //   currentPosition[index + 2] = person.z
 
       //   index += 3
       // });
@@ -250,9 +250,9 @@
 
       //   person.x = person.x + person.xDiff
       //   person.z = person.z + person.zDiff
-      //   positions[index + 0] = person.x
-      //   positions[index + 1] = person.y
-      //   positions[index + 2] = person.z
+      //   currentPosition[index + 0] = person.x
+      //   currentPosition[index + 1] = person.y
+      //   currentPosition[index + 2] = person.z
 
       //   index += 3
       // }
@@ -263,9 +263,9 @@
 
       //   person.x = person.x + person.xDiff
       //   person.z = person.z + person.zDiff
-      //   positions[index + 0] = person.x
-      //   positions[index + 1] = person.y
-      //   positions[index + 2] = person.z
+      //   currentPosition[index + 0] = person.x
+      //   currentPosition[index + 1] = person.y
+      //   currentPosition[index + 2] = person.z
 
       //   index += 3
       // }

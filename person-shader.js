@@ -1,8 +1,5 @@
-export const  PersonShader = {
+export const PersonShader = {
   uniforms: {
-    color: {
-      value: "#ffffff"
-    },
     pointTexture: {
       value: null
     }
@@ -10,29 +7,51 @@ export const  PersonShader = {
   vertexShader:
     /* glsl */
     `
-    attribute float size;
-    attribute vec4 complementaryColor;
-    attribute vec2 texCoord;
+      attribute float size;
+      attribute vec4 complementaryColor;
+      
+      varying vec4 vColor;
 
-    varying vec4 vColor;
-    varying vec2 vTexCoord;
-    
-    void main() {
-      vTexCoord = texCoord;
-      vColor = complementaryColor;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
-    }`,
+      void main() {
+        vColor = complementaryColor;
+        vec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );
+        gl_PointSize = size * ( 300.0 / -mvPosition.z );
+        gl_Position = projectionMatrix * mvPosition;
+      }`,
   fragmentShader:
     /* glsl */
     `
-    uniform vec3 color;
-    uniform sampler2D pointTexture;
+      uniform sampler2D pointTexture;
+			varying vec4 vColor;
 
-    varying vec4 vColor;
-    varying vec2 vTexCoord;
+			void main() {
+				gl_FragColor = vColor * texture2D( pointTexture, gl_PointCoord );
+			}`
+  // vertexShader:
+  //   /* glsl */
+  //   `
+  //   attribute vec3 currentPosition;
+  //   attribute float size;
+  //   attribute vec4 complementaryColor;
 
-    void main() {
-      gl_FragColor = vec4( color * vec3(vColor.r, vColor.g, vColor.b), vColor.a );
-      gl_FragColor = gl_FragColor * texture2D( pointTexture, vTexCoord );
-    }`
+  //   varying vec4 vColor;
+  //   varying vec2 vUv;
+
+  //   void main() {
+  //     vColor = complementaryColor;
+  //     vUv = uv;
+  //     vec3 vPosition = position + currentPosition;
+  //     gl_Position = projectionMatrix * modelViewMatrix * vec4( currentPosition, 1.0 );
+  //   }`,
+  // fragmentShader:
+  //   /* glsl */
+  //   `
+  //   uniform sampler2D pointTexture;
+
+  //   varying vec4 vColor;
+  //   varying vec2 vUv;
+
+  //   void main() {
+  //     gl_FragColor = vColor * texture2D( pointTexture, vUv );
+  //   }`
 };
