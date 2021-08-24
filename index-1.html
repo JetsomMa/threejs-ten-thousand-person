@@ -18,18 +18,18 @@
 
     import {
       PersonShader
-    } from './person-shader.js'
+    } from './person-shader2.js'
 
     let renderer, scene, camera;
     let personMesh // 人员的mesh对象
     let personMap = new Map() // 人员的map容器
-    let personSize = 5
+    let personSize = 1
     let advance = 0 //刷新次数，用于校准屏幕刷新频率
 
     let creenRatio = 50 //屏幕刷新频率
-    let zoneLimit = 3 //人每秒移动范围限制
+    let zoneLimit = 10 //人每秒移动范围限制
 
-    let personNumber = 10 //人员数量设定
+    let personNumber = 3 * 10000 //人员数量设定
 
     // 初始化渲染器
     renderer = new THREE.WebGLRenderer();
@@ -117,83 +117,63 @@
         person.zTarget = person.zDiff + person.z
       }
       advance = 0
-
-      // console.error("personMap", personMap)
     }
 
     function initMesh() {
       const geometry = new THREE.BufferGeometry();
-      const positions = [];
-      const texCoord = [];
-      const size = [];
-      const index =[];
-      const normal = [];
-      const uv = [];
-      const complementaryColor = [];
 
-      let diffSize = personSize / 2.0
-      let count = 0;
+      const currentPosition = [];
+      const position = [];
+      const uv = [];
+      const size = [];
+      const color = [];
+
+      let pointA = [-1, 0, -1]
+      let pointB = [-1, 0, 1]
+      let pointC = [1, 0, 1]
+      let pointD = [1, 0, -1]
+
+      let uvA = [0, 1]
+      let uvB = [1, 1]
+      let uvC = [1, 0]
+      let uvD = [0, 0]
+
+      let colorA = [0, 1, 0, 1]
 
       for (let item of personMap.values()) {
         let person = item
 
-        // positions.push(person.x + diffSize, person.y, person.z - diffSize,
-        //   person.x - diffSize, person.y, person.z - diffSize,
-        //   person.x - diffSize, person.y, person.z + diffSize,);
-        positions.push(0, 0, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0)
-        texCoord.push(0, 0, 0, 1, 1, 1, 1, 0);
-        uv.push(0, 0, 0, 1, 1, 1, 1, 0);
-        index.push(4*count+1,4*count+0,4*count+3,4*count+3,4*count+2,4*count+1);
-        normal.push(0, 1,0,0, 1,0,0, 1,0,0, 1,0);
+        let positionA = [person.x, person.y, person.z]
 
-        
+        currentPosition.push(...positionA, ...positionA, ...positionA, ...positionA, ...positionA, ...positionA);
 
+        position.push(...pointA, ...pointB, ...pointD)
+        position.push(...pointB, ...pointC, ...pointD)
 
+        uv.push(...uvA, ...uvB, ...uvD);
+        uv.push(...uvB, ...uvC, ...uvD);
 
-        // positions.push(person.x); // x
-        // positions.push(person.y); // y
-        // positions.push(person.z); // z
+        size.push(personSize,personSize,personSize,personSize,personSize,personSize)
 
-        size.push(personSize)
-        count++;
-
-        complementaryColor.push(1,1,1,1)
-
+        color.push(...colorA, ...colorA, ...colorA, ...colorA, ...colorA, ...colorA)
       }
-      console.error(positions)
-      geometry.index = new THREE.Uint16BufferAttribute(index, 1)
-      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-      geometry.setAttribute('texCoord', new THREE.Float32BufferAttribute(texCoord, 2));
+
+      geometry.setAttribute('currentPosition', new THREE.Float32BufferAttribute(position, 3));
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(position, 3));
       geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-      geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normal, 3));
       geometry.setAttribute('size', new THREE.Float32BufferAttribute(size, 1));
-      geometry.setAttribute('complementaryColor', new THREE.Float32BufferAttribute(complementaryColor, 4));
+      geometry.setAttribute('color', new THREE.Float32BufferAttribute(color, 4));
 
-      // const material = new THREE.ShaderMaterial({
-      //   uniforms: PersonShader.uniforms,
-      //   vertexShader: PersonShader.vertexShader,
-      //   fragmentShader: PersonShader.fragmentShader,
-      //   transparent: true,
-      //   depthTest: false
-      // });
-      // material.depthTest = false;
-      // material.transparent = true;
+      const material = new THREE.ShaderMaterial({
+        uniforms: PersonShader.uniforms,
+        vertexShader: PersonShader.vertexShader,
+        fragmentShader: PersonShader.fragmentShader,
+        transparent: true,
+        depthTest: false
+      });
+      material.uniforms.pointTexture.value = new THREE.TextureLoader().load('assets/images/person.png')
 
-      // material.uniforms.color.value = new THREE.Color(0xffffff)
-      // material.uniforms.pointTexture.value = new THREE.TextureLoader().load('assets/images/p-buyer.png')
-
-      // const material = new THREE.PointsMaterial({
-      //   transparent: true,
-      //   depthTest: false,
-      //   size: personSize
-      // })
-      // material.map = new THREE.TextureLoader().load("assets/images/p-buyer.png")
-
-      var texture = new THREE.TextureLoader().load( 'assets/images/p-buyer.png' );
-      var material = new THREE.MeshBasicMaterial( {side: THREE.DoubleSide,map:texture, depthTest:false,transparent:true} );
-      personMesh = new THREE.Mesh( geometry, material );
-
-      // personMesh = new THREE.Mesh(geometry, material);
+      personMesh = new THREE.Mesh(geometry, material);
       scene.add(personMesh);
     }
 
@@ -207,9 +187,9 @@
 
     // 修正人员数据
     function changeData() {
-      const positions = personMesh.geometry.attributes.position.array;
-      const size = personMesh.geometry.attributes.position.array;
-      const complementaryColor = personMesh.geometry.attributes.position.array;
+      const currentPosition = personMesh.geometry.attributes.currentPosition.array;
+      const size = personMesh.geometry.attributes.size.array;
+      const color = personMesh.geometry.attributes.color.array;
 
       let index = 0
 
@@ -219,28 +199,35 @@
 
         person.x = person.x + person.xDiff
         person.z = person.z + person.zDiff
-        positions[index * 12] = person.x - 1
-        positions[index * 12 + 1] = person.y
-        positions[index * 12 + 2] = person.z - 1
-        positions[index * 12 + 3] = person.x - 1
-        positions[index * 12 + 4] = person.y
-        positions[index * 12 + 5] = person.z + 1
-        positions[index * 12 + 6] = person.x + 1
-        positions[index * 12 + 7] = person.y
-        positions[index * 12 + 8] = person.z + 1
-        positions[index * 12 + 9] = person.x + 1
-        positions[index * 12 + 10] = person.y
-        positions[index * 12 + 11] = person.z - 1
 
 
-        // if (person.deleteStatus) {
-        //   size[index] = personSize * 2
+        if (person.deleteStatus) {
+          for (let i = 0; i < 6; i++) {
+            currentPosition[index * 18 + i * 3 + 0] = person.x
+            currentPosition[index * 18 + i * 3 + 1] = person.y
+            currentPosition[index * 18 + i * 3 + 2] = person.z
 
-        //   complementaryColor[index * 4] = 1
-        //   complementaryColor[index * 4 + 1] = 0
-        //   complementaryColor[index * 4 + 2] = 0
-        //   complementaryColor[index * 4 + 3] = 0.2
-        // }
+            color[index * 24 + i * 4] = 0
+            color[index * 24 + i * 4 + 1] = 0
+            color[index * 24 + i * 4 + 2] = 1
+            color[index * 24 + i * 4 + 3] = 0.6
+
+            size[index * 6 + i] = personSize * 1.5
+          }
+        } else {
+          for (let i = 0; i < 6; i++) {
+            currentPosition[index * 18 + i * 3 + 0] = person.x
+            currentPosition[index * 18 + i * 3 + 1] = person.y
+            currentPosition[index * 18 + i * 3 + 2] = person.z
+
+            color[index * 24 + i * 4] = 0
+            color[index * 24 + i * 4 + 1] = 1
+            color[index * 24 + i * 4 + 2] = 0
+            color[index * 24 + i * 4 + 3] = 1
+
+            size[index * 6 + i] = personSize
+          }
+        }
 
         index++
       }
@@ -249,9 +236,9 @@
       if (advance > creenRatio) {
         creenRatio = advance
       }
-      personMesh.geometry.attributes.position.needsUpdate = true;
+      personMesh.geometry.attributes.currentPosition.needsUpdate = true;
       personMesh.geometry.attributes.size.needsUpdate = true;
-      personMesh.geometry.attributes.complementaryColor.needsUpdate = true;
+      personMesh.geometry.attributes.color.needsUpdate = true;
     }
 
     // 获取随机数
