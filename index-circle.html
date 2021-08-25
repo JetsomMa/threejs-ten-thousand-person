@@ -1,0 +1,256 @@
+<!doctype html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>Large Persons</title>
+</head>
+
+<body>
+  <div id="container"></div>
+
+  <script type="module">
+    import * as THREE from './three.module.js';
+    import {
+      OrbitControls
+    } from './OrbitControls.js';
+
+    import {
+      CircleShader
+    } from './circle-shader.js'
+
+    let renderer, scene, camera;
+    let advance = 0 //刷新次数，用于校准屏幕刷新频率
+    let creenRatio = 50 //屏幕刷新频率
+
+    let personNumber = 5 * 10000 //人员数量设定
+    let zoneLimit = 30 //人每秒移动范围限制
+    let personMap = new Map() // 人员的map容器
+
+    let circleMesh // circle的mesh对象
+    let circleSize = 1
+    
+    // 初始化渲染器
+    renderer = new THREE.WebGLRenderer();
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+
+    // 获取dom容器
+    const container = document.getElementById('container');
+    container.appendChild(renderer.domElement);
+
+    // 初始化 camera
+    camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 10000);
+    camera.position.y = 150;
+
+    // 初始化 鼠标控制器
+    const controls = new OrbitControls(camera, renderer.domElement);
+
+    // 初始化 scene
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xffffff);
+
+    // 当屏幕比例发生变化时候，调整视图
+    window.addEventListener('resize', onWindowResize);
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    // 初始化人信息
+    initPerson()
+
+    // 每秒刷新人的信息
+    setInterval(() => {
+      refreshPersonInfo()
+    }, 1000)
+
+    // 初始化人的mesh对象
+    initCircleMesh()
+
+    // 开启渲染器
+    animate()
+
+    function initPerson() {
+      for (let i = 0; i < personNumber; i++) {
+        personMap.set(i, {
+          uuid: i,
+          x: 0,
+          y: 0,
+          z: 0,
+          xTarget: 0,
+          yTarget: 0,
+          zTarget: 0,
+          xDiff: 0,
+          yDiff: 0,
+          zDiff: 0,
+          deleteStatus: i % 2 === 0
+        })
+      }
+    }
+
+    function refreshPersonInfo() {
+      for (let i = 0; i < personNumber; i++) {
+        // 模拟人员位置发生变化
+        let newPerson = {
+          uuid: i,
+          xDiff: random(-1 * zoneLimit, zoneLimit),
+          yDiff: 0,
+          zDiff: random(-1 * zoneLimit, zoneLimit)
+        }
+
+        let person = personMap.get(i)
+        if (Math.abs(person.x + newPerson.xDiff) > window.innerWidth / 2) {
+          newPerson.xDiff = -1 * newPerson.xDiff
+        }
+        if (Math.abs(person.z + newPerson.zDiff) > window.innerHeight / 2) {
+          newPerson.zDiff = -1 * newPerson.zDiff
+        }
+        person.xDiff = newPerson.xDiff / creenRatio
+        person.xTarget = person.xDiff + person.x
+
+        person.zDiff = newPerson.zDiff / creenRatio
+        person.zTarget = person.zDiff + person.z
+      }
+      advance = 0
+    }
+
+    function initCircleMesh() {
+      const geometry = new THREE.BufferGeometry();
+
+      const currentPosition = [];
+      const position = [];
+      const uv = [];
+      const size = [];
+      const color = [];
+
+      let pointA = [-1, 0, -1]
+      let pointB = [-1, 0, 1]
+      let pointC = [1, 0, 1]
+      let pointD = [1, 0, -1]
+
+      let uvA = [0, 1]
+      let uvB = [1, 1]
+      let uvC = [1, 0]
+      let uvD = [0, 0]
+
+      let colorA = [0, 1, 0, 1]
+
+      for (let item of personMap.values()) {
+        let person = item
+
+        let positionA = [person.x, person.y, person.z]
+
+        currentPosition.push(...positionA, ...positionA, ...positionA, ...positionA, ...positionA, ...positionA);
+
+        position.push(...pointA, ...pointB, ...pointD)
+        position.push(...pointB, ...pointC, ...pointD)
+
+        uv.push(...uvA, ...uvB, ...uvD);
+        uv.push(...uvB, ...uvC, ...uvD);
+
+        size.push(circleSize,circleSize,circleSize,circleSize,circleSize,circleSize)
+
+        color.push(...colorA, ...colorA, ...colorA, ...colorA, ...colorA, ...colorA)
+      }
+
+      geometry.setAttribute('currentPosition', new THREE.Float32BufferAttribute(position, 3));
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(position, 3));
+      geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      geometry.setAttribute('size', new THREE.Float32BufferAttribute(size, 1));
+      geometry.setAttribute('color', new THREE.Float32BufferAttribute(color, 4));
+
+      const material = new THREE.ShaderMaterial({
+        uniforms: CircleShader.uniforms,
+        vertexShader: CircleShader.vertexShader,
+        fragmentShader: CircleShader.fragmentShader,
+
+        transparent: true,
+        depthTest: false,
+        side: THREE.DoubleSide
+      });
+      material.uniforms.pointTexture.value = new THREE.TextureLoader().load('assets/images/circle.png')
+
+      circleMesh = new THREE.Mesh(geometry, material);
+      scene.add(circleMesh);
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      changeData()
+
+      renderer.render(scene, camera);
+    }
+
+    // 修正人员数据
+    function changeData() {
+      const circlePositions = circleMesh.geometry.attributes.currentPosition.array;
+      const circleSizes = circleMesh.geometry.attributes.size.array;
+      const circleColors = circleMesh.geometry.attributes.color.array;
+
+      let index = 0
+
+      // Map进行for取值Map.values  30万人平均用时：3.9-5.1
+      for (let item of personMap.values()) {
+        let person = item
+
+        person.x = person.x + person.xDiff
+        person.z = person.z + person.zDiff
+
+
+        if (person.deleteStatus) {
+          for (let i = 0; i < 6; i++) {
+            circlePositions[index * 18 + i * 3 + 0] = person.x
+            circlePositions[index * 18 + i * 3 + 1] = person.y
+            circlePositions[index * 18 + i * 3 + 2] = person.z
+
+            circleColors[index * 24 + i * 4] = 0
+            circleColors[index * 24 + i * 4 + 1] = 0
+            circleColors[index * 24 + i * 4 + 2] = 1
+            circleColors[index * 24 + i * 4 + 3] = 0.6
+
+            circleSizes[index * 6 + i] = circleSize * 1.5
+          }
+        } else {
+          for (let i = 0; i < 6; i++) {
+            circlePositions[index * 18 + i * 3 + 0] = person.x
+            circlePositions[index * 18 + i * 3 + 1] = person.y
+            circlePositions[index * 18 + i * 3 + 2] = person.z
+
+            circleColors[index * 24 + i * 4] = 0
+            circleColors[index * 24 + i * 4 + 1] = 1
+            circleColors[index * 24 + i * 4 + 2] = 0
+            circleColors[index * 24 + i * 4 + 3] = 1
+
+            circleSizes[index * 6 + i] = circleSize
+          }
+        }
+
+        index++
+      }
+
+      advance++
+      if (advance > creenRatio) {
+        creenRatio = advance
+      }
+      circleMesh.geometry.attributes.currentPosition.needsUpdate = true;
+      circleMesh.geometry.attributes.size.needsUpdate = true;
+      circleMesh.geometry.attributes.color.needsUpdate = true;
+    }
+
+    // 获取随机数
+    function random(min, max) {
+      if (max === undefined) {
+        max = min;
+        min = 0;
+      }
+      return Math.random() * (max - min) + min;
+    }
+  </script>
+</body>
+
+</html>

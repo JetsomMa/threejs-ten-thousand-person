@@ -12,25 +12,33 @@
 
   <script type="module">
     import * as THREE from './three.module.js';
+
     import {
       OrbitControls
     } from './OrbitControls.js';
 
     import {
       PersonShader
-    } from './person-shader2.js'
+    } from './person-shader.js'
+
+    import {
+      CircleShader
+    } from './circle-shader.js'
 
     let renderer, scene, camera;
-    let personMesh // 人员的mesh对象
-    let personMap = new Map() // 人员的map容器
-    let personSize = 1
     let advance = 0 //刷新次数，用于校准屏幕刷新频率
-
     let creenRatio = 50 //屏幕刷新频率
-    let zoneLimit = 10 //人每秒移动范围限制
 
     let personNumber = 3 * 10000 //人员数量设定
+    let zoneLimit = 30 //人每秒移动范围限制
+    let personMap = new Map() // 人员的map容器
 
+    let personMesh // 人员的mesh对象
+    let personSize = 5
+
+    let circleMesh // circle的mesh对象
+    let circleSize = 1
+    
     // 初始化渲染器
     renderer = new THREE.WebGLRenderer();
     renderer.setPixelRatio(window.devicePixelRatio);
@@ -69,7 +77,9 @@
     }, 1000)
 
     // 初始化人的mesh对象
-    initMesh()
+    initPersonMesh()
+    // 初始Circle的mesh对象
+    initCircleMesh()
 
     // 开启渲染器
     animate()
@@ -93,7 +103,6 @@
     }
 
     function refreshPersonInfo() {
-
       for (let i = 0; i < personNumber; i++) {
         // 模拟人员位置发生变化
         let newPerson = {
@@ -119,7 +128,41 @@
       advance = 0
     }
 
-    function initMesh() {
+    function initPersonMesh() {
+      const geometry = new THREE.BufferGeometry();
+
+      const position = [];
+      const size = [];
+      const color = [];
+
+      for (let item of personMap.values()) {
+        let person = item
+
+        position.push(person.x, person.y, person.z);
+        size.push(personSize)
+        color.push(0, 1, 0, 1)
+      }
+
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(position, 3));
+      geometry.setAttribute('size', new THREE.Float32BufferAttribute(size, 1));
+      geometry.setAttribute('color', new THREE.Float32BufferAttribute(color, 4));
+
+      const material = new THREE.ShaderMaterial({
+        uniforms: PersonShader.uniforms,
+        vertexShader: PersonShader.vertexShader,
+        fragmentShader: PersonShader.fragmentShader,
+
+        depthTest: false,
+        transparent: true
+      });
+
+      material.uniforms.pointTexture.value = new THREE.TextureLoader().load('assets/images/person.png')
+
+      personMesh = new THREE.Points(geometry, material);
+      scene.add(personMesh);
+    }
+
+    function initCircleMesh() {
       const geometry = new THREE.BufferGeometry();
 
       const currentPosition = [];
@@ -153,7 +196,7 @@
         uv.push(...uvA, ...uvB, ...uvD);
         uv.push(...uvB, ...uvC, ...uvD);
 
-        size.push(personSize,personSize,personSize,personSize,personSize,personSize)
+        size.push(circleSize,circleSize,circleSize,circleSize,circleSize,circleSize)
 
         color.push(...colorA, ...colorA, ...colorA, ...colorA, ...colorA, ...colorA)
       }
@@ -165,16 +208,18 @@
       geometry.setAttribute('color', new THREE.Float32BufferAttribute(color, 4));
 
       const material = new THREE.ShaderMaterial({
-        uniforms: PersonShader.uniforms,
-        vertexShader: PersonShader.vertexShader,
-        fragmentShader: PersonShader.fragmentShader,
-        transparent: true,
-        depthTest: false
-      });
-      material.uniforms.pointTexture.value = new THREE.TextureLoader().load('assets/images/person.png')
+        uniforms: CircleShader.uniforms,
+        vertexShader: CircleShader.vertexShader,
+        fragmentShader: CircleShader.fragmentShader,
 
-      personMesh = new THREE.Mesh(geometry, material);
-      scene.add(personMesh);
+        transparent: true,
+        depthTest: false,
+        side: THREE.DoubleSide
+      });
+      material.uniforms.pointTexture.value = new THREE.TextureLoader().load('assets/images/circle.png')
+
+      circleMesh = new THREE.Mesh(geometry, material);
+      scene.add(circleMesh);
     }
 
     function animate() {
@@ -187,9 +232,15 @@
 
     // 修正人员数据
     function changeData() {
-      const currentPosition = personMesh.geometry.attributes.currentPosition.array;
-      const size = personMesh.geometry.attributes.size.array;
-      const color = personMesh.geometry.attributes.color.array;
+      // 获取人的属性内容
+      const personPositions = personMesh.geometry.attributes.position.array;
+      const personSizes = personMesh.geometry.attributes.size.array;
+      const personColors = personMesh.geometry.attributes.color.array;
+
+      // 获取环的属性内容
+      const circlePositions = circleMesh.geometry.attributes.currentPosition.array;
+      const circleSizes = circleMesh.geometry.attributes.size.array;
+      const circleColors = circleMesh.geometry.attributes.color.array;
 
       let index = 0
 
@@ -200,32 +251,60 @@
         person.x = person.x + person.xDiff
         person.z = person.z + person.zDiff
 
+        // 更新人的坐标
+        personPositions[index * 3] = person.x
+        personPositions[index * 3 + 1] = person.y
+        personPositions[index * 3 + 2] = person.z
 
         if (person.deleteStatus) {
+          // 更新人的大小
+          personSizes[index] = personSize * 2
+
+          // 更新人的颜色
+          personColors[index * 4] = 0
+          personColors[index * 4 + 1] = 0
+          personColors[index * 4 + 2] = 1
+          personColors[index * 4 + 3] = 1
+
           for (let i = 0; i < 6; i++) {
-            currentPosition[index * 18 + i * 3 + 0] = person.x
-            currentPosition[index * 18 + i * 3 + 1] = person.y
-            currentPosition[index * 18 + i * 3 + 2] = person.z
+            // 更新环的坐标
+            circlePositions[index * 18 + i * 3 + 0] = person.x
+            circlePositions[index * 18 + i * 3 + 1] = person.y
+            circlePositions[index * 18 + i * 3 + 2] = person.z
 
-            color[index * 24 + i * 4] = 0
-            color[index * 24 + i * 4 + 1] = 0
-            color[index * 24 + i * 4 + 2] = 1
-            color[index * 24 + i * 4 + 3] = 0.6
+            // 更新环的颜色
+            circleColors[index * 24 + i * 4] = 0
+            circleColors[index * 24 + i * 4 + 1] = 0
+            circleColors[index * 24 + i * 4 + 2] = 1
+            circleColors[index * 24 + i * 4 + 3] = 0.6
 
-            size[index * 6 + i] = personSize * 1.5
+            //更新环的大小
+            circleSizes[index * 6 + i] = circleSize * 1.5
           }
         } else {
+          // 更新人的大小
+          personSizes[index] = personSize
+
+          // 更新人的颜色
+          personColors[index * 4] = 0
+          personColors[index * 4 + 1] = 1
+          personColors[index * 4 + 2] = 0
+          personColors[index * 4 + 3] = 1
+
           for (let i = 0; i < 6; i++) {
-            currentPosition[index * 18 + i * 3 + 0] = person.x
-            currentPosition[index * 18 + i * 3 + 1] = person.y
-            currentPosition[index * 18 + i * 3 + 2] = person.z
+            // 更新环的坐标
+            circlePositions[index * 18 + i * 3 + 0] = person.x
+            circlePositions[index * 18 + i * 3 + 1] = person.y
+            circlePositions[index * 18 + i * 3 + 2] = person.z
 
-            color[index * 24 + i * 4] = 0
-            color[index * 24 + i * 4 + 1] = 1
-            color[index * 24 + i * 4 + 2] = 0
-            color[index * 24 + i * 4 + 3] = 1
+            // 更新环的颜色
+            circleColors[index * 24 + i * 4] = 0
+            circleColors[index * 24 + i * 4 + 1] = 1
+            circleColors[index * 24 + i * 4 + 2] = 0
+            circleColors[index * 24 + i * 4 + 3] = 1
 
-            size[index * 6 + i] = personSize
+            //更新环的大小
+            circleSizes[index * 6 + i] = circleSize
           }
         }
 
@@ -236,9 +315,16 @@
       if (advance > creenRatio) {
         creenRatio = advance
       }
-      personMesh.geometry.attributes.currentPosition.needsUpdate = true;
+
+      // 更新人的属性内容
+      personMesh.geometry.attributes.position.needsUpdate = true;
       personMesh.geometry.attributes.size.needsUpdate = true;
       personMesh.geometry.attributes.color.needsUpdate = true;
+
+      // 更新环的属性内容
+      circleMesh.geometry.attributes.currentPosition.needsUpdate = true;
+      circleMesh.geometry.attributes.size.needsUpdate = true;
+      circleMesh.geometry.attributes.color.needsUpdate = true;
     }
 
     // 获取随机数

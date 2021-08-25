@@ -1,4 +1,4 @@
-export const PersonShader = {
+export const CircleShader = {
   uniforms: {
     pointTexture: {
       value: null
