@@ -11,14 +11,14 @@
   <div id="container"></div>
 
   <script type="module">
-    import * as THREE from './three.module.js';
+    import * as THREE from './assets/js/three.module.js';
     import {
       OrbitControls
-    } from './OrbitControls.js';
+    } from './assets/js/OrbitControls.js';
 
     import {
       PersonShader
-    } from './person-shader.js'
+    } from './shader/person-shader.js'
 
     let renderer, scene, camera;
     let advance = 0 //刷新次数，用于校准屏幕刷新频率
