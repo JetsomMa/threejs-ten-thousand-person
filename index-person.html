@@ -24,12 +24,22 @@
     let advance = 0 //刷新次数，用于校准屏幕刷新频率
     let creenRatio = 50 //屏幕刷新频率
 
-    let personNumber = 10 * 10000 //人员数量设定
-    let zoneLimit = 30 //人每秒移动范围限制
+    let personNumber = 1 * 10000 //人员数量设定
+    let zoneLimit = 1 //人每秒移动范围限制
     let personMap = new Map() // 人员的map容器
 
     let personMesh // 人员的mesh对象
     let personSize = 5
+
+    let selectedPersonIndex = -1
+    let selectedPerson = null
+
+    // 定义选择器
+    let raycaster = new THREE.Raycaster();
+    raycaster.params.Points.threshold = 0.5;
+
+    let clickPointer = new THREE.Vector2();
+    let clickStatus = false
 
     // 初始化渲染器
     renderer = new THREE.WebGLRenderer();
@@ -60,6 +70,15 @@
       renderer.setSize(window.innerWidth, window.innerHeight);
     }
 
+    // 当鼠标抬起时候出发click
+    document.addEventListener('pointerup', onMouseUp);
+
+    function onMouseUp(event) {
+      clickPointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+      clickPointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+      clickStatus = true
+    }
+
     // 初始化人信息
     initPerson()
 
@@ -70,6 +89,8 @@
 
     // 初始化人的mesh对象
     initPersonMesh()
+
+    initGridHelper()
 
     // 开启渲染器
     animate()
@@ -160,8 +181,31 @@
       renderer.render(scene, camera);
     }
 
+    function pointSelect() {
+      if (clickStatus) {
+        personMesh.geometry.computeBoundingSphere()
+        raycaster.setFromCamera(clickPointer, camera);
+
+        const intersects = raycaster.intersectObject(personMesh);
+        if (intersects.length > 0) {
+          selectedPersonIndex = -1
+          let index = selectedPersonIndex
+          intersects.forEach(person => {
+            index = person.index
+            if (selectedPersonIndex < index) {
+              selectedPersonIndex = index
+            }
+          })
+        }
+
+        clickStatus = false
+      }
+    }
+
     // 修正人员数据
     function changeData() {
+      pointSelect()
+
       const personPositions = personMesh.geometry.attributes.position.array;
       const personSizes = personMesh.geometry.attributes.size.array;
       const personColors = personMesh.geometry.attributes.color.array;
@@ -172,6 +216,10 @@
       for (let item of personMap.values()) {
         let person = item
 
+        if (selectedPersonIndex !== -1 && selectedPersonIndex === index) {
+          selectedPerson = person
+        }
+
         person.x = person.x + person.xDiff
         person.z = person.z + person.zDiff
 
@@ -180,7 +228,7 @@
         personPositions[index * 3 + 2] = person.z
 
         if (person.deleteStatus) {
-          personSizes[index] = personSize * 2
+          personSizes[index] = personSize * 1.2
 
           personColors[index * 4] = 0
           personColors[index * 4 + 1] = 0
@@ -191,6 +239,15 @@
 
           personColors[index * 4] = 0
           personColors[index * 4 + 1] = 1
+          personColors[index * 4 + 2] = 0
+          personColors[index * 4 + 3] = 1
+        }
+
+        if (selectedPerson === person) {
+          personSizes[index] = personSize * 3
+
+          personColors[index * 4] = 0
+          personColors[index * 4 + 1] = 0
           personColors[index * 4 + 2] = 0
           personColors[index * 4 + 3] = 1
         }
@@ -214,6 +271,15 @@
         min = 0;
       }
       return Math.random() * (max - min) + min;
+    }
+
+    // 初始化辅助网格
+    function initGridHelper() {
+      const helper = new THREE.GridHelper(150, 150);
+      helper.position.y = -0.1;
+      helper.material.opacity = 0.25;
+      helper.material.transparent = true;
+      scene.add(helper);
     }
   </script>
 </body>
