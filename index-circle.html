@@ -43,6 +43,8 @@
     // 初始化 camera
     camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 10000);
     camera.position.y = 150;
+    camera.position.x = 150;
+    camera.position.z = 150;
 
     // 初始化 鼠标控制器
     const controls = new OrbitControls(camera, renderer.domElement);
