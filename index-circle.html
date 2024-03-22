@@ -73,6 +73,8 @@
     // 初始化人的mesh对象
     initCircleMesh()
 
+    initGridHelper()
+
     // 开启渲染器
     animate()
 
@@ -251,6 +253,15 @@
         min = 0;
       }
       return Math.random() * (max - min) + min;
+    }
+
+    // 初始化辅助网格
+    function initGridHelper() {
+      const helper = new THREE.GridHelper(250, 250);
+      helper.position.y = -0.1;
+      helper.material.opacity = 0.5;
+      helper.material.transparent = true;
+      scene.add(helper);
     }
   </script>
 </body>
